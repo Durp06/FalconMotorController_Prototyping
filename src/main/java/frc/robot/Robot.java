@@ -16,8 +16,12 @@ import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.DutyCycleOut;
 import com.ctre.phoenix6.controls.VelocityVoltage;
 import com.ctre.phoenix6.hardware.TalonFX;
+import com.ctre.phoenix6.signals.ForwardLimitSourceValue;
+import com.ctre.phoenix6.signals.ForwardLimitTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
+import com.ctre.phoenix6.signals.ReverseLimitSourceValue;
+import com.ctre.phoenix6.signals.ReverseLimitTypeValue;
 
 /**
  * The VM is configured to automatically run this class, and to call the functions corresponding to
@@ -27,44 +31,76 @@ import com.ctre.phoenix6.signals.NeutralModeValue;
  */
 public class Robot extends TimedRobot {
 
-  public int canIDs[] = new int[] {8, 9, 10, 11};
-  public TalonFX motors[] = new TalonFX[canIDs.length];
+  public TalonFX angle = new TalonFX(10);
+  public TalonFX velo = new TalonFX(2);
 
-  //public TalonFX motor = new TalonFX(10);
+  public Robot() {
+    super(0.005);
+  }
 
-
-  private void configureDriveMotor(TalonFX y) {
+  private void configureDriveMotor() {
     var driveConfig = new TalonFXConfiguration();
     driveConfig.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
-    driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Coast;
+    driveConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     driveConfig.Slot0.kP = 20.0;
     driveConfig.Slot0.kI = 0;
     driveConfig.Slot0.kD = 0;
 
-    
-    y.getConfigurator().apply(driveConfig);
-    //motor2.getConfigurator().apply(driveConfig);
-}
+    driveConfig.HardwareLimitSwitch.ForwardLimitRemoteSensorID = 1;
+    driveConfig.HardwareLimitSwitch.ReverseLimitRemoteSensorID = 2;
+
+    driveConfig.HardwareLimitSwitch.ForwardLimitEnable = true;
+    driveConfig.HardwareLimitSwitch.ReverseLimitEnable = true;
+
+    driveConfig.HardwareLimitSwitch.ForwardLimitType = ForwardLimitTypeValue.NormallyClosed;
+    driveConfig.HardwareLimitSwitch.ReverseLimitType = ReverseLimitTypeValue.NormallyClosed;
+
+    var driveConfig2 = new TalonFXConfiguration();
+    driveConfig2.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
+    driveConfig2.MotorOutput.NeutralMode = NeutralModeValue.Brake;
+    driveConfig2.Slot0.kP = 20.0;
+    driveConfig2.Slot0.kI = 0;
+    driveConfig2.Slot0.kD = 0;
+
+    driveConfig2.HardwareLimitSwitch.ForwardLimitRemoteSensorID = angle.getDeviceID();
+    driveConfig2.HardwareLimitSwitch.ReverseLimitRemoteSensorID = angle.getDeviceID();
+
+    driveConfig2.HardwareLimitSwitch.ReverseLimitSource = ReverseLimitSourceValue.RemoteTalonFX;
+    driveConfig2.HardwareLimitSwitch.ForwardLimitSource = ForwardLimitSourceValue.RemoteTalonFX;
+
+    driveConfig2.HardwareLimitSwitch.ForwardLimitType = ForwardLimitTypeValue.NormallyClosed;
+    driveConfig2.HardwareLimitSwitch.ReverseLimitType = ReverseLimitTypeValue.NormallyClosed;
+
+    angle.getConfigurator().apply(driveConfig);
+    velo.getConfigurator().apply(driveConfig2);
+  }
   /**
    * This function is run when the robot is first started up and should be used for any
    * initialization code.
    */
   @Override
   public void robotInit() {
-    for (int i = 0; i<canIDs.length; i++){
-      motors[i] = new TalonFX(canIDs[i]);
-       SmartDashboard.putNumber("PercentOut" + i, 0);
-       configureDriveMotor(motors[i]);
-    }
+    SmartDashboard.putNumber("PercentOut1", 0);
+    SmartDashboard.putNumber("PercentOut2", 0);
+
+    configureDriveMotor();
   }
 
-  /*public double getPercentOut() {
+  public double getPercentOut1() {
     return NetworkTableInstance
       .getDefault()
       .getTable("/SmartDashboard")
-      .getEntry("PercentOut")
+      .getEntry("PercentOut1")
       .getDouble(0.0);
-  }*/
+  }
+
+    public double getPercentOut2() {
+    return NetworkTableInstance
+      .getDefault()
+      .getTable("/SmartDashboard")
+      .getEntry("PercentOut2")
+      .getDouble(0.0);
+  }
 
  
 
@@ -77,18 +113,15 @@ public class Robot extends TimedRobot {
    */
   @Override
   public void robotPeriodic() {
-    for (int x = 0; x < motors.length; x++){
-      var request = new DutyCycleOut(
-      NetworkTableInstance
-        .getDefault()
-        .getTable("/SmartDashboard")
-        .getEntry("PercentOut" + x)
-        .getDouble(0.0)
-        );
-      motors[x].setControl(request);
+    SmartDashboard.putNumber("RPM 1", angle.getRotorVelocity().getValue() * 60);
+    SmartDashboard.putNumber("RPM 2", velo.getRotorVelocity().getValue() * 60);
 
-      SmartDashboard.putNumber("RPM " + x, motors[x].getRotorVelocity().getValue() * 60);
-      SmartDashboard.putNumber("Voltage", motors[x].getTorqueCurrent().getValue());
+
+    var request1 = new DutyCycleOut(getPercentOut1());
+    var request2 = new DutyCycleOut(getPercentOut2());
+
+    angle.setControl(request1);
+    velo.setControl(request2);
     }
 
     // var request1 = new DutyCycleOut(getPercentOut());
@@ -99,4 +132,4 @@ public class Robot extends TimedRobot {
   }
  
 
-}
+
